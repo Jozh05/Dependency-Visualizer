@@ -6,6 +6,8 @@
 #include <tinyxml2.h>
 #include <vector>
 
+using namespace tinyxml2;
+
 // Функция для записи полученных данных в файл
 size_t WriteCallback(void* ptr, size_t size, size_t nmemb, void* data) {
     size_t total_size = size * nmemb;
@@ -55,24 +57,27 @@ std::string ExtractFile(const std::vector<char>& archive_data) {
     return file_content;
 }
 
-int main()
-{
-    
+void curl(std::vector<char>& archive_data) {
     CURL* curl;
     CURLcode response;
     curl = curl_easy_init();
-
-    std::vector<char> archive_data;
-
+    
     curl_easy_setopt(curl, CURLOPT_URL, "https://www.nuget.org/api/v2/package/Serilog/4.1.1-dev-02318");
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &archive_data);
     response = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
+}
+
+int main()
+{
+    std::vector<char> archive_data;
+    curl(archive_data);
 
     std::string test_string = ExtractFile(archive_data);
     std::cout << test_string << std::endl;
+
 }
 
 //https://www.nuget.org/api/v2/package/System.Drawing.Common/9.0.0
