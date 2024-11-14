@@ -6,6 +6,8 @@
 #include <tinyxml2.h>
 #include <vector>
 
+#include<fstream>
+
 // Функция для записи полученных данных в файл
 size_t WriteCallback(void* ptr, size_t size, size_t nmemb, void* data) {
     size_t total_size = size * nmemb;
