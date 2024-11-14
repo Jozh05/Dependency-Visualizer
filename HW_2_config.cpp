@@ -14,17 +14,18 @@ size_t WriteCallback(void* ptr, size_t size, size_t nmemb, void* data) {
     return total_size;
 }
 
-void ExtractFile(const std::vector<char>& archive_data) {
+std::string ExtractFile(const std::vector<char>& archive_data) {
     struct archive* a = archive_read_new();
     archive_read_support_format_all(a);
     archive_read_support_compression_all(a);
 
     if (archive_read_open_memory(a, archive_data.data(), archive_data.size()) != ARCHIVE_OK) {
         std::cerr << "Failed to open archive" << std::endl;
-        return;
+        return "";
     }
 
     struct archive_entry* entry;
+    std::string file_content;
     while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
         const char* filename = archive_entry_pathname(entry);
         if (strstr(filename, ".nuspec") == nullptr) {
@@ -38,8 +39,7 @@ void ExtractFile(const std::vector<char>& archive_data) {
         char buffer[8192];  // Буфер для хранения данных
 
         size_t bytes_read;
-        std::string file_content;
-
+        
         // Чтение данных из архива и сохранение в буфер
         while ((bytes_read = archive_read_data(a, buffer, sizeof(buffer))) > 0) {
             file_content.append(buffer, bytes_read);
@@ -49,12 +49,10 @@ void ExtractFile(const std::vector<char>& archive_data) {
             std::cerr << "Error reading data for " << filename << ": "
                 << archive_error_string(a) << std::endl;
         }
-
-        // Вывод содержимого на экран
-        std::cout << file_content << std::endl;
     }
 
     archive_read_free(a);  // Освобождаем ресурсы
+    return file_content;
 }
 
 int main()
@@ -73,7 +71,8 @@ int main()
     response = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
 
-    ExtractFile(archive_data);
+    std::string test_string = ExtractFile(archive_data);
+    std::cout << test_string << std::endl;
 }
 
 //https://www.nuget.org/api/v2/package/System.Drawing.Common/9.0.0
