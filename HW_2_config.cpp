@@ -1,6 +1,7 @@
 ﻿#include <iostream>
 #include <vector>
 #include <unordered_set>
+#include <stdexcept>
 
 
 #include <curl/curl.h>
@@ -20,13 +21,18 @@ size_t WriteCallback(void* ptr, size_t size, size_t nmemb, void* data) {
 
 struct MyHash {
     template <typename T1,typename T2>
-    std::size_t operator()(const std::pair<T1, T2>& p) const {
+    std::size_t operator()(const std::pair<const T1, const T2>& p) const {
         std::size_t h1 = std::hash<T1>{}(p.first);
         std::size_t h2 = std::hash<T2>{}(p.second);
         return h1 ^ (h2 << 1);
     }
 };
 
+class XMLParseException : public std::runtime_error {
+public:
+    explicit XMLParseException(const std::string& message)
+        : std::runtime_error(message) {}
+};
 
 std::string ExtractFile(const std::vector<char>& archive_data) {
     struct archive* a = archive_read_new();
@@ -82,54 +88,56 @@ void curl(std::vector<char>& archive_data) {
     curl_easy_cleanup(curl);
 }
 
+
 using namespace tinyxml2;
 
-int main()
-{
-    std::vector<char> archive_data;
-    curl(archive_data);
 
-    std::string test_string = ExtractFile(archive_data);
-
-
+std::unordered_set<std::pair<const std::string, const std::string>, MyHash> ExtractDependenciesFromFile(const std::string xml_string) {
+    
     tinyxml2::XMLDocument doc;
+    std::unordered_set<std::pair<const std::string, const std::string>, MyHash> result;
 
-    XMLError eResult = doc.Parse(test_string.c_str());
+    XMLError eResult = doc.Parse(xml_string.c_str());
     if (eResult != XML_SUCCESS) {
         std::cerr << "Ошибка парсинга XML: " << eResult << std::endl;
-        return -1;
+        throw XMLParseException("XML Parse Error");
     }
     doc.Print();
-    
 
-    XMLElement* packageElement = doc.FirstChildElement("package");
-    if (packageElement == nullptr) {
-        std::cerr << "Ошибка: не найден корневой элемент <package>" << std::endl;
-        return -1;
-    }
 
-    XMLElement* dependenciesElement = packageElement->FirstChildElement("metadata")->FirstChildElement("dependencies");
+    XMLElement* dependenciesElement = doc.FirstChildElement("package")->FirstChildElement("metadata")->FirstChildElement("dependencies");
+
     std::cout << dependenciesElement->Name() << std::endl;
     if (dependenciesElement == nullptr) {
         std::cout << "Зависимости не найдены." << std::endl;
-        return 0;
+        return result;
     }
-
-    std::unordered_set<std::pair<std::string, std::string>, MyHash> set;
 
     for (XMLElement* group_el = dependenciesElement->FirstChildElement("group"); group_el != nullptr; group_el = group_el->NextSiblingElement("group")) {
         for (XMLElement* depElement = group_el->FirstChildElement("dependency"); depElement != nullptr; depElement = depElement->NextSiblingElement("dependency")) {
             std::string id = depElement->Attribute("id");
             std::string version = depElement->Attribute("version");
 
-            set.emplace( id, version );
+            result.emplace(id, version);
             std::cout << "ID: " << id << ", Version: " << version << std::endl;
         }
     }
     std::cout << "Now in set" << std::endl;
-    for (const auto& elem : set) {
+    for (const auto& elem : result) {
         std::cout << "ID: " << elem.first << ", Version: " << elem.second << std::endl;
     }
+    return result;
+}
+
+
+
+int main()
+{
+    std::vector<char> archive_data;
+    curl(archive_data);
+    std::string test_string = ExtractFile(archive_data);
+
+    std::unordered_set<std::pair<const std::string, const std::string>, MyHash> set = ExtractDependenciesFromFile(test_string);
 }
 
 //https://www.nuget.org/api/v2/package/System.Drawing.Common/9.0.0
