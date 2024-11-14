@@ -1,12 +1,13 @@
 ﻿#include <iostream>
+#include <vector>
+
+
 #include <curl/curl.h>
 #include <graphviz/gvc.h>
 #include <archive.h>
 #include <archive_entry.h>
 #include <tinyxml2.h>
-#include <vector>
 
-using namespace tinyxml2;
 
 // Функция для записи полученных данных в файл
 size_t WriteCallback(void* ptr, size_t size, size_t nmemb, void* data) {
@@ -70,14 +71,49 @@ void curl(std::vector<char>& archive_data) {
     curl_easy_cleanup(curl);
 }
 
+using namespace tinyxml2;
+
 int main()
 {
     std::vector<char> archive_data;
     curl(archive_data);
 
     std::string test_string = ExtractFile(archive_data);
-    std::cout << test_string << std::endl;
 
+
+    tinyxml2::XMLDocument doc;
+
+    XMLError eResult = doc.Parse(test_string.c_str());
+    if (eResult != XML_SUCCESS) {
+        std::cerr << "Ошибка парсинга XML: " << eResult << std::endl;
+        return -1;
+    }
+    doc.Print();
+    
+
+    XMLElement* packageElement = doc.FirstChildElement("package");
+    if (packageElement == nullptr) {
+        std::cerr << "Ошибка: не найден корневой элемент <package>" << std::endl;
+        return -1;
+    }
+
+    XMLElement* dependenciesElement = packageElement->FirstChildElement("metadata")->FirstChildElement("dependencies");
+    std::cout << dependenciesElement->Name() << std::endl;
+    if (dependenciesElement == nullptr) {
+        std::cout << "Зависимости не найдены." << std::endl;
+        return 0;
+    }
+
+    for (XMLElement* group_el = dependenciesElement->FirstChildElement("group"); group_el != nullptr; group_el = group_el->NextSiblingElement("group")) {
+        for (XMLElement* depElement = group_el->FirstChildElement("dependency"); depElement != nullptr; depElement = depElement->NextSiblingElement("dependency")) {
+            const char* id = depElement->Attribute("id");
+            const char* version = depElement->Attribute("version");
+
+            if (id != nullptr && version != nullptr) {
+                std::cout << "ID: " << id << ", Version: " << version << std::endl;
+            }
+        }
+    }
 }
 
 //https://www.nuget.org/api/v2/package/System.Drawing.Common/9.0.0
