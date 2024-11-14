@@ -20,7 +20,7 @@ size_t WriteCallback(void* ptr, size_t size, size_t nmemb, void* data) {
 }
 
 struct MyHash {
-    template <typename T1,typename T2>
+    template <typename T1, typename T2>
     std::size_t operator()(const std::pair<const T1, const T2>& p) const {
         std::size_t h1 = std::hash<T1>{}(p.first);
         std::size_t h2 = std::hash<T2>{}(p.second);
@@ -59,7 +59,7 @@ std::string ExtractFile(const std::vector<char>& archive_data) {
         char buffer[8192];  // Буфер для хранения данных
 
         size_t bytes_read;
-        
+
         // Чтение данных из архива и сохранение в буфер
         while ((bytes_read = archive_read_data(a, buffer, sizeof(buffer))) > 0) {
             file_content.append(buffer, bytes_read);
@@ -75,11 +75,11 @@ std::string ExtractFile(const std::vector<char>& archive_data) {
     return file_content;
 }
 
-void curl(std::string url, std::vector<char>& archive_data) {
+void curl(const char* url, std::vector<char>& archive_data) {
     CURL* curl;
     CURLcode response;
     curl = curl_easy_init();
-    
+
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
@@ -93,7 +93,7 @@ using namespace tinyxml2;
 
 
 std::unordered_set<std::pair<const std::string, const std::string>, MyHash> ExtractDependenciesFromFile(const std::string xml_string) {
-    
+
     tinyxml2::XMLDocument doc;
     std::unordered_set<std::pair<const std::string, const std::string>, MyHash> result;
 
@@ -133,12 +133,12 @@ std::unordered_set<std::pair<const std::string, const std::string>, MyHash> Extr
 
 int main()
 {
+    setlocale(LC_ALL, "rus");
     std::vector<char> archive_data;
     curl("https://www.nuget.org/api/v2/package/Serilog/4.1.1-dev-02318", archive_data);
     std::string test_string = ExtractFile(archive_data);
 
     std::unordered_set<std::pair<const std::string, const std::string>, MyHash> set = ExtractDependenciesFromFile(test_string);
-
 }
 
 //https://www.nuget.org/api/v2/package/System.Drawing.Common/9.0.0
