@@ -1,5 +1,6 @@
 ﻿#include <iostream>
 #include <vector>
+#include <unordered_set>
 
 
 #include <curl/curl.h>
@@ -16,6 +17,16 @@ size_t WriteCallback(void* ptr, size_t size, size_t nmemb, void* data) {
     buffer->insert(buffer->end(), (char*)ptr, (char*)ptr + total_size);
     return total_size;
 }
+
+struct MyHash {
+    template <typename T1,typename T2>
+    std::size_t operator()(const std::pair<T1, T2>& p) const {
+        std::size_t h1 = std::hash<T1>{}(p.first);
+        std::size_t h2 = std::hash<T2>{}(p.second);
+        return h1 ^ (h2 << 1);
+    }
+};
+
 
 std::string ExtractFile(const std::vector<char>& archive_data) {
     struct archive* a = archive_read_new();
@@ -104,15 +115,20 @@ int main()
         return 0;
     }
 
+    std::unordered_set<std::pair<std::string, std::string>, MyHash> set;
+
     for (XMLElement* group_el = dependenciesElement->FirstChildElement("group"); group_el != nullptr; group_el = group_el->NextSiblingElement("group")) {
         for (XMLElement* depElement = group_el->FirstChildElement("dependency"); depElement != nullptr; depElement = depElement->NextSiblingElement("dependency")) {
-            const char* id = depElement->Attribute("id");
-            const char* version = depElement->Attribute("version");
+            std::string id = depElement->Attribute("id");
+            std::string version = depElement->Attribute("version");
 
-            if (id != nullptr && version != nullptr) {
-                std::cout << "ID: " << id << ", Version: " << version << std::endl;
-            }
+            set.emplace( id, version );
+            std::cout << "ID: " << id << ", Version: " << version << std::endl;
         }
+    }
+    std::cout << "Now in set" << std::endl;
+    for (const auto& elem : set) {
+        std::cout << "ID: " << elem.first << ", Version: " << elem.second << std::endl;
     }
 }
 
