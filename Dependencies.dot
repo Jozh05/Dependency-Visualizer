@@ -1,0 +1,5 @@
+digraph dependencies {
+	A -> "System.Diagnostics.DiagnosticSource_8.0.1";
+	A -> "System.Threading.Channels_8.0.0";
+	A -> "System.ValueTuple_4.5.0";
+}

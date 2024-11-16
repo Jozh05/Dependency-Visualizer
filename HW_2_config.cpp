@@ -1,7 +1,9 @@
 ﻿#include <iostream>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 #include <stdexcept>
+#include <fstream>
 
 
 #include <curl/curl.h>
@@ -9,7 +11,6 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <tinyxml2.h>
-
 
 // Функция для записи полученных данных в файл
 size_t WriteCallback(void* ptr, size_t size, size_t nmemb, void* data) {
@@ -107,7 +108,6 @@ std::unordered_set<std::pair<const std::string, const std::string>, MyHash> Extr
 
     XMLElement* dependenciesElement = doc.FirstChildElement("package")->FirstChildElement("metadata")->FirstChildElement("dependencies");
 
-    std::cout << dependenciesElement->Name() << std::endl;
     if (dependenciesElement == nullptr) {
         std::cout << "Зависимости не найдены." << std::endl;
         return result;
@@ -129,16 +129,62 @@ std::unordered_set<std::pair<const std::string, const std::string>, MyHash> Extr
     return result;
 }
 
-
-
-int main()
-{
-    setlocale(LC_ALL, "rus");
-    std::vector<char> archive_data;
-    curl("https://www.nuget.org/api/v2/package/Serilog/4.1.1-dev-02318", archive_data);
-    std::string test_string = ExtractFile(archive_data);
-
+void ProcessPackage(std::string current_name, std::string current_url, std::vector<char>& buffer, std::vector<std::string>& vec, 
+std::unordered_set<std::string>& visited) {
+    if (visited.contains(current_name))
+        return;
+    visited.insert(current_name);
+    curl(current_url.c_str(), buffer);
+    std::string test_string = ExtractFile(buffer);
+    buffer.clear();
     std::unordered_set<std::pair<const std::string, const std::string>, MyHash> set = ExtractDependenciesFromFile(test_string);
+    if (set.empty())
+        return;
+
+    for (const auto& el : set) {
+        vec.emplace_back("\t\"" + current_name + "\"" + " -> " + "\"" + el.first + "_" + el.second + "\"" + ";\n");
+    }
+
+    for (const auto& el : set) {
+        ProcessPackage(el.first + "_" + el.second, "https://www.nuget.org/api/v2/package/" + el.first + "/" + el.second, buffer, vec, visited);
+    }
+}
+
+
+int main(int argc, char* argv[])
+{
+    setlocale(LC_ALL, "rus"); 
+    std::vector<char> archive_data;
+    std::vector<std::string> vec;
+    std::unordered_set<std::string> visited;
+    std::string current_name = "Microsoft.Extensions.Logging_9.0.0";
+    std::string current_url = "https://www.nuget.org/api/v2/package/Microsoft.Extensions.Logging/9.0.0";
+    std::cout << current_name << std::endl;
+    std::cout << current_url << std::endl;
+
+    ProcessPackage(current_name, current_url, archive_data, vec, visited);
+
+    const std::size_t bufferSize = 1024 * 1024 * 5;
+    char* buffer = new char[bufferSize];
+
+    std::ofstream dot("C:\\Temp\\file.dot");
+    dot.rdbuf()->pubsetbuf(buffer, bufferSize);
+
+    if (!dot) {
+        std::cerr << "Ошибка при открытии файла!" << std::endl;
+        return 1;
+    }
+    dot << "digraph dependencies {\n";
+
+    for (const auto& dep : vec) {
+        dot << dep;
+    }
+
+    dot << "}\n";
+
+    // Закрываем файл
+    dot.close();
+    delete[] buffer;
 }
 
 //https://www.nuget.org/api/v2/package/System.Drawing.Common/9.0.0
